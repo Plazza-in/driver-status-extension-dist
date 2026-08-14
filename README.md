@@ -78,11 +78,56 @@ None of this can force an update through a network that blocks all three
 domains. What it does guarantee is that somebody *finds out*, instead of a
 silently frozen extension being discovered weeks later.
 
-**If GitHub Pages itself ever gets blocked:** `update-jsdelivr.xml` is
-already published, pointing at the same `.crx` on jsDelivr's CDN. Switch
-the Workspace policy's update URL to
-`https://cdn.jsdelivr.net/gh/Plazza-in/driver-status-extension-dist@main/update-jsdelivr.xml`
-— one field, same policy row, no re-enrolment and nothing else to change.
+### If a host gets blocked again — the runbook
+
+This already happened once and will not be the last time, so the recovery
+is deliberately short.
+
+**Symptom:** the side panel shows its "auto-updates appear stuck" banner, or
+someone reports being on an old version, or a release you pushed never
+reaches anyone.
+
+```bash
+cd ~/Desktop/driver-status-extension-dist
+./check-mirrors.sh
+```
+
+It reports which feeds are reachable **from that machine** and prints the
+exact policy string to paste. Run it on an affected agent's machine when you
+can — a mirror that works from your laptop may still be blocked on theirs,
+and theirs is the network that matters.
+
+Then edit **one field**: `admin.google.com → Devices → Chrome → Apps &
+extensions → Users and browsers` → the existing entry → its Update URL.
+Same policy row. No re-enrolment, no new setup, nothing else changes — and
+it's the same console you set the policy up in, so you aren't waiting on
+anyone else to do it.
+
+**If every mirror is down everywhere**, all three are GitHub-backed, so
+publish the feed somewhere independent (Cloudflare Pages, Netlify and Vercel
+are free and unrelated to GitHub) and point the policy there. The `.crx` and
+`update.xml` are just two static files; any host that serves them over plain
+HTTPS will do.
+
+### Making this never need a policy edit again
+
+The permanent fix is a **custom domain** — e.g. `ext.plazza.in` as a CNAME to
+GitHub Pages, with the policy pointing at
+`https://ext.plazza.in/update.xml` forever. Moving hosts then becomes a DNS
+change instead of a Workspace change, and a `plazza.in` hostname is far less
+likely to be caught by the kind of security policy that blocks public code
+CDNs in the first place.
+
+Two honest caveats: it needs whoever controls `plazza.in` DNS to add one
+record (a one-time ask), and it defends against *hostname*-based blocks —
+the common kind, and what appears to have hit
+`raw.githubusercontent.com` — but not a block on the underlying IPs, since
+the CNAME resolves to the same servers.
+
+**Worth doing while updates still work.** The mirror list the extension
+checks itself against is compiled into the shipped `.crx`, so it can only be
+changed by shipping an update — which requires updates to be working. Adding
+a stable domain after everything is already stuck is exactly too late.
 
 ## Releasing a new version
 
