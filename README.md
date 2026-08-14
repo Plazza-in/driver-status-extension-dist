@@ -52,48 +52,68 @@ Users & browsers**, on the support team's org unit, as a **Force install**
 entry using **"Custom App"** / by extension ID + update URL (not "search
 the Chrome Web Store" — this extension isn't listed there).
 
+## What happens when this breaks
+
+The failure mode worth designing against is not a loud one. If the update
+URL is unreachable from an agent's network, Chrome shows no error, the
+agent has no reason to open `chrome://extensions`, and they simply keep
+running an old version forever. Three layers exist so that can't stay
+invisible:
+
+1. **The extension checks its own version** (`background.js`, every 6h and
+   on browser start) against **three independent domains** — GitHub Pages,
+   jsDelivr, and GitHub's raw CDN. One being blocked or down doesn't blind
+   it. If it finds itself behind, it first calls
+   `chrome.runtime.requestUpdateCheck()` to make Chrome retry immediately —
+   a genuine self-heal, not just a complaint.
+2. **The side panel says so**, top of the panel, if an update has been
+   available for over 24h and still hasn't installed. Under that threshold
+   it stays quiet, because Chrome routinely takes a few hours and crying
+   wolf at every release would train people to ignore it. If every mirror
+   is unreachable it notes that quietly in the footer instead — "can't
+   tell" is different from "you're behind".
+3. **`release.sh` refuses to ship a broken release** — see below.
+
+None of this can force an update through a network that blocks all three
+domains. What it does guarantee is that somebody *finds out*, instead of a
+silently frozen extension being discovered weeks later.
+
+**If GitHub Pages itself ever gets blocked:** `update-jsdelivr.xml` is
+already published, pointing at the same `.crx` on jsDelivr's CDN. Switch
+the Workspace policy's update URL to
+`https://cdn.jsdelivr.net/gh/Plazza-in/driver-status-extension-dist@main/update-jsdelivr.xml`
+— one field, same policy row, no re-enrolment and nothing else to change.
+
 ## Releasing a new version
 
-From the main extension repo (`plazza-driver-status-extension`), after
-bumping `version` in `manifest.json`:
+Bump `version` in the extension's `manifest.json`, then:
 
 ```bash
-# 1. Stage only the runtime files (not server/, docs, install scripts, zips)
-STAGE=/tmp/ext-staging
-rm -rf "$STAGE" && mkdir -p "$STAGE/icons"
-cp manifest.json background.js content-freshchat.js \
-   sidepanel.html sidepanel.js sidepanel.css "$STAGE/"
-cp icons/*.png "$STAGE/icons/"
-
-# 2. Chrome requires PKCS#8 — convert the key into a throwaway temp copy,
-#    pack, then shred the copy. Never commit or leave this lying around.
-openssl pkcs8 -topk8 -nocrypt \
-  -in ~/Downloads/plazza-extension-signing-key.pem \
-  -out /tmp/signing-key-pkcs8.pem
-
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --pack-extension="$STAGE" \
-  --pack-extension-key=/tmp/signing-key-pkcs8.pem \
-  --user-data-dir=/tmp/chrome-pack-profile \
-  --headless --no-first-run
-
-shred -u /tmp/signing-key-pkcs8.pem || rm -f /tmp/signing-key-pkcs8.pem
-rm -rf /tmp/chrome-pack-profile
-
-# 3. Move the crx here, versioned, and update update.xml's version + codebase
-mv "$STAGE.crx" ~/Desktop/driver-status-extension-dist/plazza-driver-status-vX.Y.Z.crx
+cd ~/Desktop/driver-status-extension-dist
+./release.sh                 # or: ./release.sh /path/to/extension-source
+git add -A && git commit -m "Release vX.Y.Z" && git push
 ```
 
-Then edit `update.xml`'s `version` and `codebase` (keep it on the
-`plazza-in.github.io/...` domain, just bump the filename), and:
+That's it. The script stages the runtime files, packs and signs the `.crx`,
+and regenerates every feed variant from one source of truth.
 
-```bash
-git add -A
-git commit -m "Release vX.Y.Z"
-git push
-```
+It also refuses to produce a release that would break force-install
+silently, which is the whole reason it exists rather than a list of manual
+steps:
 
-Enrolled browsers pick it up on their next update check — nobody needs to
-do anything, including you, beyond this push. Old `.crx` versions can stay
-in the repo (harmless, just history) or be deleted once you're confident
-everyone's updated past them.
+- **Wrong signing key** → the extension ID changes, and enrolled browsers
+  would stop recognising the extension entirely. The script derives the ID
+  from the key and aborts unless it matches the pinned one.
+- **Version not bumped** → Chrome ignores any feed whose version isn't
+  strictly newer, so the release would appear to succeed and do nothing.
+  The script aborts if that `.crx` already exists.
+- **Feeds drifting out of sync** → both feed variants are regenerated
+  together, so one can't be left pointing at an older build.
+- **Syntax errors** → `node --check` on every script and a JSON parse of
+  the manifest, before anything is packed.
+
+The temp PKCS#8 copy of the private key is shredded on exit, including if
+the script fails partway through.
+
+Old `.crx` versions can stay in the repo (harmless history) or be deleted
+once everyone's updated past them.
