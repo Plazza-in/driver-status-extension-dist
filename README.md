@@ -8,6 +8,15 @@ every path, so the updater can never read anything hosted there. This repo
 is public specifically so `update.xml` and the `.crx` are reachable by a
 bare `curl`, which is all Chrome's updater can do.
 
+**Served via GitHub Pages (`plazza-in.github.io`), not
+`raw.githubusercontent.com`** — the latter hung indefinitely (no error, just
+never completed) from two independent networks when first tested
+2026-08-14, a classic signature of a network silently blocking that
+specific hostname. `github.io` is a different domain entirely, unaffected.
+If Pages ever has the same problem, the fix is the same idea again: move to
+yet another domain and update the Workspace policy's Update URL to match —
+see "Releasing a new version" below for where that URL is defined.
+
 Nothing sensitive lives here. The `.crx` is the same code that would have
 shipped via the Chrome Web Store or a "Load unpacked" folder either way —
 making it public doesn't expose anything that wasn't already going out to
@@ -35,7 +44,7 @@ Management. From then on, Chrome:
 **Policy value** (give this to whoever has Chrome management admin rights):
 
 ```
-ijocfdgbkehhnbhpoppeeoelegfildde;https://raw.githubusercontent.com/Plazza-in/driver-status-extension-dist/main/update.xml
+ijocfdgbkehhnbhpoppeeoelegfildde;https://plazza-in.github.io/driver-status-extension-dist/update.xml
 ```
 
 Set under **admin.google.com → Devices → Chrome → Apps & extensions →
@@ -75,7 +84,8 @@ rm -rf /tmp/chrome-pack-profile
 mv "$STAGE.crx" ~/Desktop/driver-status-extension-dist/plazza-driver-status-vX.Y.Z.crx
 ```
 
-Then edit `update.xml`'s `version` and `codebase` filename to match, and:
+Then edit `update.xml`'s `version` and `codebase` (keep it on the
+`plazza-in.github.io/...` domain, just bump the filename), and:
 
 ```bash
 git add -A
