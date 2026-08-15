@@ -18,14 +18,14 @@ set -euo pipefail
 
 SRC="${1:-$HOME/Downloads/plazza-driver-status-extension}"
 DIST="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KEY="$HOME/Downloads/plazza-extension-signing-key.pem"
+KEY="$HOME/Downloads/plazza-extension-signing-key-v2.pem"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 # The ID every enrolled browser has pinned. If a build ever produces a
 # different one, that build must NOT ship: Chrome would treat it as an
 # unrelated extension and the force-install policy would quietly stop
 # matching. This is the single most important check in this script.
-EXPECTED_ID="ijocfdgbkehhnbhpoppeeoelegfildde"
+EXPECTED_ID="jcoackohkdbhkojionoojgonlgkddckk"
 
 PAGES_BASE="https://plazza-in.github.io/driver-status-extension-dist"
 JSDELIVR_BASE="https://cdn.jsdelivr.net/gh/Plazza-in/driver-status-extension-dist@main"
